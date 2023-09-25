@@ -1,0 +1,24 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - echo "[INFO] Install OS dependencies"
+      - sudo apt update && sudo apt install -y jq unzip curl wget docker
+      - echo "[INFO] Install aws-cli"
+      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - unzip -q awscliv2.zip && sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+      - echo "[INFO] Install kubectl"
+      - curl -LO "https://dl.k8s.io/release/v1.22.0/bin/linux/amd64/kubectl"
+      - sudo mv kubectl  /usr/local/bin && chmod +x /usr/local/bin/kubectl
+  pre_build:
+    commands:
+      - #export TAG=${COMMIT_HASH_APP}
+      - #export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output=text)
+      - #export KUBECONFIG=$HOME/.kube/config
+      - #export IMAGE_VERSION=$ECR_REPO_URI':'$COMMIT_HASH_APP
+      - env
+      - bash ./BuildGreen/load-eksconfig.sh
+      - kubectl get nodes
+  build:
+    commands:
+      - bash ./BuildGreen/switch-green-blue.sh
