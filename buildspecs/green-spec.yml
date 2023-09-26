@@ -15,7 +15,7 @@ phases:
   pre_build:
     commands:
       - cd $CODEBUILD_SRC_DIR_AppSourceOutput/
-      - export COMMIT_HASH_APP=$(cat image_hash.txt)
+      - export COMMIT_HASH_APP=$(cat $CODEBUILD_SRC_DIR_AppSourceOutput/image_tag.txt)
       - export TAG=${COMMIT_HASH_APP}
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output=text)
       - export KUBECONFIG=$HOME/.kube/config
@@ -35,6 +35,7 @@ phases:
         fi
   build:
     commands:
+      - cd $CODEBUILD_SRC_DIR_AppSourceOutput/
       - vpcId=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.resourcesVpcConfig.vpcId" --output text)
       - cidrs=$(aws ec2 describe-vpcs --vpc-id $vpcId --query "Vpcs[*].CidrBlock" --output text)
       - |
@@ -43,36 +44,36 @@ phases:
           cidrs="${cidrs},${CIDR_PORTAL_INTERNO}"
         fi
       ## Update templates k8s templates
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-namespace.yml
-      - sed -i.bk 's/AWS_ACCOUNT_ID_PLACEHOLDER/'$AWS_ACCOUNT_ID'/g'  k8s/app-serviceaccount.yml
-      - sed -i.bk 's/APP_PREFIX_PLACEHOLDER/'${AppPrefixLower}'/g'    k8s/app-serviceaccount.yml
-      - sed -i.bk 's/ENVIRONMENT_PLACEHOLDER/'${EnvironmentLower}'/g' k8s/app-serviceaccount.yml
-      - sed -i.bk 's/SERVICE_NAME_PLACEHOLDER/'${SERVICE_NAME}'/g'    k8s/app-serviceaccount.yml
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-service-green.yml
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-service-blue.yml
-      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     k8s/app-service-green.yml
-      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     k8s/app-service-blue.yml
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-deployment-green.yml
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-deployment-blue.yml
-      - sed -i.bk 's/CLUSTER_NAME_PLACEHOLDER/'$CLUSTER_NAME'/g'      k8s/app-deployment-green.yml
-      - sed -i.bk 's/CLUSTER_NAME_PLACEHOLDER/'$CLUSTER_NAME'/g'      k8s/app-deployment-blue.yml
-      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     k8s/app-deployment-green.yml
-      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     k8s/app-deployment-blue.yml
-      - sed -i.bk 's+LOG_GROUP_PLACEHOLDER+'$APP_LOG_GROUP'+g'        k8s/app-deployment-green.yml
-      - sed -i.bk 's+LOG_GROUP_PLACEHOLDER+'$APP_LOG_GROUP'+g'        k8s/app-deployment-blue.yml
-      - sed -i.bk 's+ECR_REPO_PLACEHOLDER+'$IMAGE_VERSION'+g'         k8s/app-deployment-green.yml
-      - sed -i.bk 's+ECR_REPO_PLACEHOLDER+'$IMAGE_VERSION'+g'         k8s/app-deployment-blue.yml
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-ingress-blue.yml
-      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        k8s/app-ingress-green.yml
-      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     k8s/app-ingress-blue.yml
-      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     k8s/app-ingress-green.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-namespace.yml
+      - sed -i.bk 's/AWS_ACCOUNT_ID_PLACEHOLDER/'$AWS_ACCOUNT_ID'/g'  $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-serviceaccount.yml
+      - sed -i.bk 's/APP_PREFIX_PLACEHOLDER/'${AppPrefixLower}'/g'    $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-serviceaccount.yml
+      - sed -i.bk 's/ENVIRONMENT_PLACEHOLDER/'${EnvironmentLower}'/g' $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-serviceaccount.yml
+      - sed -i.bk 's/SERVICE_NAME_PLACEHOLDER/'${SERVICE_NAME}'/g'    $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-serviceaccount.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-service-green.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-service-blue.yml
+      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-service-green.yml
+      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-service-blue.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-green.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-blue.yml
+      - sed -i.bk 's/CLUSTER_NAME_PLACEHOLDER/'$CLUSTER_NAME'/g'      $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-green.yml
+      - sed -i.bk 's/CLUSTER_NAME_PLACEHOLDER/'$CLUSTER_NAME'/g'      $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-blue.yml
+      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-green.yml
+      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-blue.yml
+      - sed -i.bk 's+LOG_GROUP_PLACEHOLDER+'$APP_LOG_GROUP'+g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-green.yml
+      - sed -i.bk 's+LOG_GROUP_PLACEHOLDER+'$APP_LOG_GROUP'+g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-blue.yml
+      - sed -i.bk 's+ECR_REPO_PLACEHOLDER+'$IMAGE_VERSION'+g'         $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-green.yml
+      - sed -i.bk 's+ECR_REPO_PLACEHOLDER+'$IMAGE_VERSION'+g'         $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-deployment-blue.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-blue.yml
+      - sed -i.bk 's/NAMESPACE_PLACEHOLDER/'$EKS_NAMESPACE'/g'        $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-green.yml
+      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-blue.yml
+      - sed -i.bk 's/SERVICENAME_PLACEHOLDER/'${SERVICE_NAME}'/g'     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-green.yml
       - subnets=$(eksctl get fargateprofile  --cluster $CLUSTER_NAME --name $EKS_FARGATE_PROFILE --region $AWS_DEFAULT_REGION -o json | jq .[0].subnets -r | sed 's/[][]//g' | sed ':a;N;$!ba;s/\n//g' | sed 's/ //g' | sed 's/"//g')
-      - sed -i.bk 's/SUBNETS_PLACEHOLDER/'$subnets'/g'                k8s/app-ingress-blue.yml
-      - sed -i.bk 's/SUBNETS_PLACEHOLDER/'$subnets'/g'                k8s/app-ingress-green.yml
-      - sed -i.bk 's+CIDR_PLACEHOLDER+'$cidrs'+g'                     k8s/app-ingress-blue.yml
-      - sed -i.bk 's+CIDR_PLACEHOLDER+'$cidrs'+g'                     k8s/app-ingress-green.yml
-      - sed -i.bk 's+ACM_PLACEHOLDER+'$ARN_ACM'+g'                    k8s/app-ingress-blue.yml
-      - sed -i.bk 's+ACM_PLACEHOLDER+'$ARN_ACM'+g'                    k8s/app-ingress-green.yml
+      - sed -i.bk 's/SUBNETS_PLACEHOLDER/'$subnets'/g'                $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-blue.yml
+      - sed -i.bk 's/SUBNETS_PLACEHOLDER/'$subnets'/g'                $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-green.yml
+      - sed -i.bk 's+CIDR_PLACEHOLDER+'$cidrs'+g'                     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-blue.yml
+      - sed -i.bk 's+CIDR_PLACEHOLDER+'$cidrs'+g'                     $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-green.yml
+      - sed -i.bk 's+ACM_PLACEHOLDER+'$ARN_ACM'+g'                    $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-blue.yml
+      - sed -i.bk 's+ACM_PLACEHOLDER+'$ARN_ACM'+g'                    $CODEBUILD_SRC_DIR_AppSourceOutput/k8s/app-ingress-green.yml
       - isGreenDeployed=$(kubectl get deployment/${SERVICE_NAME}-backend-green -n $EKS_NAMESPACE | grep -v "^NAME"| wc -l|awk '{print $NF}')
       - isBlueDeployed=$(kubectl get deployment/${SERVICE_NAME}-backend-blue -n $EKS_NAMESPACE | grep -v "^NAME"| wc -l|awk '{print $NF}')
       - bash ./BuildGreen/first-deployment.sh

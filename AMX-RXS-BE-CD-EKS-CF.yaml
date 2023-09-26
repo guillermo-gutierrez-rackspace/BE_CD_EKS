@@ -150,8 +150,8 @@ Resources:
               - "logs:DescribeLogStreams"
           - Effect: "Allow"
             Resource:
-              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/*-${AWS::AccountId}"
-              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/*-${AWS::AccountId}*"
+              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/*"
+              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/**"
             Action:
               - "codebuild:CreateReportGroup"
               - "codebuild:CreateReport"
@@ -364,7 +364,11 @@ Resources:
               - !Sub "arn:${AWS::Partition}:secretsmanager:*:${AWS::AccountId}:secret:*"
               - !Sub "arn:${AWS::Partition}:kms:*:${AWS::AccountId}:key/*"
 
-  CicdRoleForServiceAccount:
+  CdRoleForServiceAccount:
+    DependsOn:
+      - CloudWatchWriteAccess
+      - S3ReadWriteAccess
+      - SMKMSReadAccess
     Type: 'AWS::IAM::Role'
     Properties:
       RoleName: !Sub '${AppPrefix}-${EnvironmentName}-${ServiceName}-sa'
@@ -445,6 +449,8 @@ Resources:
   # CodeBuild Projects
 
   GreenBuildStage:
+    DependsOn:
+      - BuildBlueGreenPolicy
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub "${AppPrefix}-${EnvironmentName}-CI-CB-GREEN-${ServiceName}"
@@ -503,6 +509,8 @@ Resources:
           Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-VpcId"
 
   SwapGreenBlueBuildStage:
+    DependsOn: 
+      - BuildBlueGreenPolicy
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub "${AppPrefix}-${EnvironmentName}-CB-SWP-${ServiceName}"
