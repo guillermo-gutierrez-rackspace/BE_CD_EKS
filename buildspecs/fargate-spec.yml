@@ -1,0 +1,30 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - echo "[INFO] Install OS dependencies"
+      - sudo apt update && sudo apt install -y jq unzip curl wget
+      - echo "[INFO] Install aws-cli"
+      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - unzip -q awscliv2.zip && sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+  pre_build:
+    commands:
+      - env
+      - echo "EKS_FARGATE_PROFILE=${EKS_FARGATE_PROFILE}"
+      - FargateProfileName=$(aws eks list-fargate-profiles --cluster-name ${CLUSTER_NAME} --query 'fargateProfileNames[?@==`'${EKS_FARGATE_PROFILE}'`]' --output text | sed 's/\n//g')
+      - echo -n "FargateProfileName=${FargateProfileName}"
+  build:
+    commands:
+      - |
+        if [ "${FargateProfileName}" = "" ]
+        then
+          FargatePodExecutionRoleArn=$(aws cloudformation list-exports --query 'Exports[?Name==`'${APP_PREFIX}'-'${ENVIRONMENT}'-EKS-FargatePodExecutionRole`].Value' --output text)
+          aws eks create-fargate-profile                           \
+            --cluster-name ${CLUSTER_NAME}                         \
+            --fargate-profile-name ${EKS_FARGATE_PROFILE}          \
+            --pod-execution-role-arn ${FargatePodExecutionRoleArn} \
+            --selectors namespace=${EKS_NAMESPACE}                 \
+            --subnets ${SUBNET1} ${SUBNET2}
+        else
+          echo "Fargate Profile ${FargateProfileName} already exists..."
+        fi

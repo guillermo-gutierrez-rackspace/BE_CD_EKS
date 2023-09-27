@@ -1,0 +1,25 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: NAMESPACE_PLACEHOLDER
+  name: SERVICENAME_PLACEHOLDER-backend-green
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/subnets: SUBNETS_PLACEHOLDER
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: ACM_PLACEHOLDER
+    alb.ingress.kubernetes.io/inbound-cidrs: CIDR_PLACEHOLDER
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: SERVICENAME_PLACEHOLDER-bknd-svc-8080
+              port:
+                number: 8080

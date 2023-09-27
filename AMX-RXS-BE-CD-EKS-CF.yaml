@@ -62,7 +62,7 @@ Parameters:
   EcrAWSImagesReg:
     Type: String
     Description: "Registro de imágenes de contenedor de Amazon. Referencia: https://docs.aws.amazon.com/eks/latest/userguide/add-ons-images.html. us-east-1 --> 602401143452.dkr.ecr.us-east-1.amazonaws.com"
-  LoggroupApp:
+  LogGroupApp:
     Type: String
     Description: "Nombre del LogGroup de CloudWatch a donde se reportaran los eventos del aplicativo."
 #  ControlPlaneSecurityGroup:
@@ -185,7 +185,8 @@ Resources:
             Action:
               - "cloudformation:*"
             Resource:
-              - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/eksctl*"
+              - '*'
+#              - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/eksctl*"
           - Effect: "Allow"
             Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:*"
             Action:
@@ -272,8 +273,8 @@ Resources:
             Action:
               - "sns:Publish"
             Resource:
-              - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AppPrefix}-${EnvironmentName}-CB-Errors-EKS-${ServiceName}"
-              - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AppPrefix}-${EnvironmentName}-CB-MA-EKS-${ServiceName}"
+              - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AppPrefix}-${EnvironmentName}-CD-CB-Errors-EKS-${ServiceName}"
+              - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AppPrefix}-${EnvironmentName}-CD-CB-MA-EKS-${ServiceName}"
           - Effect: "Allow"
             Action:
               - "kms:Encrypt"
@@ -288,7 +289,7 @@ Resources:
     Properties:
       ServiceToken:
         Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-ConfigManagerArn"
-      NodeIamRoleArn: !GetAtt DeployBlueGreenRole.Arn
+      CbIamRoleArn: !GetAtt DeployBlueGreenRole.Arn
 
 
   # Application Service Account Permissions (Role)
@@ -371,7 +372,7 @@ Resources:
       - SMKMSReadAccess
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: !Sub '${AppPrefix}-${EnvironmentName}-${ServiceName}-sa'
+      RoleName: !Sub '${AppPrefix}-${EnvironmentName}-sa-${ServiceName}'
       AssumeRolePolicyDocument:
         Statement:
           - Action:
@@ -379,7 +380,7 @@ Resources:
             Condition:
               StringEquals:
                 '${OidcProviderId}:aud': sts.amazonaws.com
-                '${OidcProviderId}:sub': !Sub 'system:serviceaccount:${AppPrefix}-${EnvironmentName}-ns:${AppPrefix}-${EnvironmentName}-${ServiceName}-sa'
+                '${OidcProviderId}:sub': !Sub 'system:serviceaccount:${AppPrefix}-${EnvironmentName}-ns-${ServiceName}:${AppPrefix}-${EnvironmentName}-sa-${ServiceName}'
             Effect: Allow
             Principal:
               Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/${OidcProviderId}'
@@ -448,6 +449,58 @@ Resources:
 
   # CodeBuild Projects
 
+  FargateProfileStage:
+    DependsOn:
+      - BuildBlueGreenPolicy
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AppPrefix}-${EnvironmentName}-CI-CB-FARGATE-${ServiceName}"
+      Description: "Deploy Fargate Profile Stage"
+      EncryptionKey: !Ref ArnCodeBuildCMK
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:7.0"
+        PrivilegedMode: yes
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: APP_PREFIX
+            Value: !Ref AppPrefix
+          - Name: ENVIRONMENT 
+            Value: !Ref EnvironmentName
+          - Name: CLUSTER_NAME
+            Value: !Ref EKSClusterName
+          - Name: EKS_FARGATE_PROFILE
+            Value: !Ref EksFargateProfile
+          - Name: EKS_NAMESPACE
+            Value: !Ref EksNameSpace
+          - Name: SUBNET1
+            Value:
+              Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-Subnet-1"
+          - Name: SUBNET2
+            Value:
+              Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-Subnet-2"
+      ServiceRole: !GetAtt BuildBlueGreenRole.Arn
+      Source:
+        BuildSpec: buildspecs/fargate-spec.yml
+        Type: "CODEPIPELINE"
+      TimeoutInMinutes: 30
+      QueuedTimeoutInMinutes: 30
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref CdEksLogGroup
+          StreamName: "fargateprofile-stage"
+          Status: ENABLED
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-NodeSecurityGroupId"
+        Subnets:
+          - Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-Subnet-1"
+          - Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-Subnet-2"
+        VpcId:
+          Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-VpcId"
+
   GreenBuildStage:
     DependsOn:
       - BuildBlueGreenPolicy
@@ -481,13 +534,19 @@ Resources:
           - Name: EKS_NAMESPACE
             Value: !Ref EksNameSpace
           - Name: APP_LOG_GROUP
-            Value: !Ref LoggroupApp
+            Value: !Ref LogGroupApp
           - Name: ARN_ACM
             Value: !Ref ArnCertificate
           - Name: EKS_ROLE_ARN
             Value: !GetAtt DeployBlueGreenRole.Arn
           - Name: CIDR_PORTAL_INTERNO
             Value: !Ref CidrPortalInterno
+          - Name: SUBNET1
+            Value:
+              Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-Subnet-1"
+          - Name: SUBNET2
+            Value:
+              Fn::ImportValue: !Sub "${AppPrefix}-${EnvironmentName}-EKS-Subnet-2"
       ServiceRole: !GetAtt BuildBlueGreenRole.Arn
       Source:
         BuildSpec: buildspecs/green-spec.yml
@@ -630,9 +689,25 @@ Resources:
                 BranchName: !Ref RepoCdBranchName
                 DetectChanges: false
 
+        - Name: FargateProfileStage
+          Actions:
+            - Name: FargateProfileStage
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: AppSourceOutput
+                - Name: CDSourceOutput
+              Configuration:
+                ProjectName: !Ref FargateProfileStage
+                PrimarySource: CDSourceOutput
+              RunOrder: 1
+
         - Name: DeployGreenEnv
           Actions:
-            - Name: CodeBuild
+            - Name: DeployGreenEnv
               ActionTypeId:
                 Category: Build
                 Owner: AWS
@@ -695,8 +770,8 @@ Resources:
 
 Outputs:
 
-  S3ArtifactBucket:
-    Description: S3 Artifact Bucket
+  BeCdArtifactBucket:
+    Description: BE CD Artifact Bucket
     Value: !Ref ArtifactBucket
     Export:
       Name: !Sub "${AppPrefix}-${EnvironmentName}-cd-eks-${ServiceName}"
