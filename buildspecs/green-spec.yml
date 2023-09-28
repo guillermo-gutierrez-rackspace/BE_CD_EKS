@@ -14,7 +14,7 @@ phases:
       - sudo mv kubectl  /usr/local/bin && chmod +x /usr/local/bin/kubectl
   pre_build:
     commands:
-      - export COMMIT_HASH_APP=$(cat $CODEBUILD_SRC_DIR_AppSourceOutput/build.txt)
+      - export COMMIT_HASH_APP=$(cat $CODEBUILD_SRC_DIR_AppSourceOutput/build.json)
       - export TAG=${COMMIT_HASH_APP}
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output=text)
       - export KUBECONFIG=$HOME/.kube/config
